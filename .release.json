@@ -4,6 +4,9 @@
 			{
 				"name": "Building dist files",
 				"command": "gulp",
+				"args": [
+					"--release"
+				],
 				"comment": "[TASK] Rebuilt dist files"
 			}
 		]

@@ -1,439 +1,304 @@
-var GithubApi = require('github');
-var gulp = require('gulp');
-var path = require('canonical-path');
-var pkg = require('./package.json');
-var request = require('request');
-var q = require('q');
-var semver = require('semver');
-var through = require('through');
+const gulp    = require( "gulp" );
+const pkg     = require( "./package.json" );
+const request = require( "request" );
+const q       = require( "q" );
+const through = require( "through" );
 
-var argv = require('minimist')(process.argv.slice(2));
+const argv = require( "minimist" )( process.argv.slice( 2 ) );
 
-var _ = require('lodash');
-var buildConfig = require('./config/build.config.js');
-var changelog = require('conventional-changelog');
-var es = require('event-stream');
-var irc = require('ircb');
-var marked = require('marked');
-var mkdirp = require('mkdirp');
-var twitter = require('node-twitter-api');
+const _           = require( "lodash" );
+const buildConfig = require( "./config/build.config.js" );
+const changelog   = require( "conventional-changelog" );
+const marked      = require( "marked" );
 
-var cp = require('child_process');
-var fs = require('fs');
+const fs = require( "fs" );
 
-var concat = require('gulp-concat');
-var footer = require('gulp-footer');
-var gulpif = require('gulp-if');
-var header = require('gulp-header');
-var eslint = require('gulp-eslint');
-var jscs = require('gulp-jscs');
+const concat = require( "gulp-concat" );
+const footer = require( "gulp-footer" );
+const gulpif = require( "gulp-if" );
+const header = require( "gulp-header" );
+const eslint = require( "gulp-eslint" );
 // var minifyCss = require('gulp-minify-css');
-var cleanCss = require('gulp-clean-css');
-var rename = require('gulp-rename');
-var rimraf = require("rimraf");
-var runSequence = require('run-sequence');
-var sass = require('gulp-sass');
-var stripDebug = require('gulp-strip-debug');
-var template = require('gulp-template');
-var uglify = require('gulp-uglify');
-var gutil = require('gulp-util');
+const cleanCss    = require( "gulp-clean-css" );
+const rename      = require( "gulp-rename" );
+const rimraf      = require( "rimraf" );
+const runSequence = require( "run-sequence" );
+const sass        = require( "gulp-sass" );
+const stripDebug  = require( "gulp-strip-debug" );
+const template    = require( "gulp-template" );
+const uglify      = require( "gulp-uglify" );
+const gutil       = require( "gulp-util" );
 
-var banner = _.template(buildConfig.banner, { pkg: pkg });
+const banner = _.template( buildConfig.banner, {
+	pkg : pkg
+} );
 
-var IS_RELEASE_BUILD = !!argv.release;
-if (IS_RELEASE_BUILD) {
-  gutil.log(
-    gutil.colors.red('--release:'),
-    'Building release version (minified, debugs stripped)...'
-  );
+const IS_RELEASE_BUILD = Boolean( argv.release );
+if( IS_RELEASE_BUILD ) {
+	gutil.log(
+		gutil.colors.red( "--release:" ),
+		"Building release version (minified, debugs stripped)..."
+	);
 }
 
-/**
- * Load Test Tasks
- */
-require('./config/gulp-tasks/test')(gulp, argv);
-
-/**
- * Load Docs Tasks
- */
-require('./config/gulp-tasks/docs')(gulp, argv);
-
-if (argv.dist) {
-  buildConfig.dist = argv.dist;
+if( argv.dist ) {
+	buildConfig.dist = argv.dist;
 }
 
-gulp.task('default', ['build']);
-gulp.task('build', ['bundle', 'sass']);
-gulp.task('validate', ['jscs', 'eslint', 'ddescribe-iit'], function() {
-  gulp.run('karma')
-});
+gulp.task( "default", [ "build" ] );
+gulp.task( "build", [ "bundle", "sass" ] );
+gulp.task( "validate", [ "eslint", "ddescribe-iit" ], () => {
+	gulp.run( "karma" );
+} );
 
-var IS_WATCH = false;
-gulp.task('watch', ['build'], function() {
-  IS_WATCH = true;
-  gulp.watch('js/**/*.js', ['bundle']);
-  gulp.watch('scss/**/*.scss', ['sass']);
-});
+let IS_WATCH = false;
+gulp.task( "watch", [ "build" ], () => {
+	IS_WATCH = true;
+	gulp.watch( "js/**/*.js", [ "bundle" ] );
+	gulp.watch( "scss/**/*.scss", [ "sass" ] );
+} );
 
-gulp.task('changelog', function() {
-  var dest = argv.dest || 'CHANGELOG.md';
-  var toHtml = !!argv.html;
-  return makeChangelog(argv).then(function(log) {
-    if (toHtml) {
-      log = marked(log, {
-        gfm: true
-      });
-    }
-    fs.writeFileSync(dest, log);
-  });
-});
+gulp.task( "changelog", () => {
+	const dest   = argv.dest || "CHANGELOG.md";
+	const toHtml = Boolean( argv.html );
+	return makeChangelog( argv ).then( log => {
+		if( toHtml ) {
+			log = marked( log, {
+				gfm : true
+			} );
+		}
+		fs.writeFileSync( dest, log );
+	} );
+} );
 
-function makeChangelog(options) {
-  var codename = pkg.codename;
-  var file = options.standalone ? '' : __dirname + '/CHANGELOG.md';
-  var subtitle = options.subtitle || '"' + codename + '"';
-  var from = options.from;
-  var version = options.version || pkg.version;
-  var deferred = q.defer();
-  changelog({
-    repository: 'https://github.com/ionic-team/ionic',
-    version: version,
-    subtitle: subtitle,
-    file: file,
-    from: from
-  }, function(err, log) {
-    if (err) deferred.reject(err);
-    else deferred.resolve(log);
-  });
-  return deferred.promise;
+function makeChangelog( options ) {
+	const file     = options.standalone ? "" : `${__dirname}/CHANGELOG.md`;
+	const subtitle = options.subtitle || "";
+	const from     = options.from;
+	const version  = options.version || pkg.version;
+	const deferred = q.defer();
+	changelog( {
+		repository : "https://github.com/fairmanager-cordova/ionic-sdk",
+		version : version,
+		subtitle : subtitle,
+		file : file,
+		from : from
+	}, ( err, log ) => {
+		if( err ) {
+			deferred.reject( err );
+		} else {
+			deferred.resolve( log );
+		}
+	} );
+	return deferred.promise;
 }
 
-gulp.task('bundle', [
-  'scripts',
-  'scripts-ng',
-  'vendor',
-  'version'
-], function() {
-  gulp.src(buildConfig.ionicBundleFiles.map(function(src) {
-      return src.replace(/.js$/, '.min.js');
-    }), {
-      base: buildConfig.dist,
-      cwd: buildConfig.dist
-    })
-      .pipe(header(buildConfig.bundleBanner))
-      .pipe(concat('ionic.bundle.min.js'))
-      .pipe(gulp.dest(buildConfig.dist + '/js'));
+gulp.task( "bundle", [
+	"scripts",
+	"scripts-ng",
+	"vendor",
+	"version"
+], () => {
+	gulp.src( buildConfig.ionicBundleFiles.map( src => src.replace( /.js$/, ".min.js" ) ), {
+		base : buildConfig.dist,
+		cwd : buildConfig.dist
+	} )
+		.pipe( header( buildConfig.bundleBanner ) )
+		.pipe( concat( "ionic.bundle.min.js" ) )
+		.pipe( gulp.dest( `${buildConfig.dist}/js` ) );
 
-  return gulp.src(buildConfig.ionicBundleFiles, {
-    base: buildConfig.dist,
-    cwd: buildConfig.dist
-  })
-    .pipe(header(buildConfig.bundleBanner))
-    .pipe(concat('ionic.bundle.js'))
-    .pipe(gulp.dest(buildConfig.dist + '/js'));
-});
+	return gulp.src( buildConfig.ionicBundleFiles, {
+		base : buildConfig.dist,
+		cwd : buildConfig.dist
+	} )
+		.pipe( header( buildConfig.bundleBanner ) )
+		.pipe( concat( "ionic.bundle.js" ) )
+		.pipe( gulp.dest( `${buildConfig.dist}/js` ) );
+} );
 
-gulp.task('jscs', function() {
-  return gulp.src(['js/angular/**/*.js'])
-    .pipe(jscs({
-      configPath: '.jscs.json'
-    }));
-});
+gulp.task( "eslint", () => gulp.src( [ "js/**/*.js" ] )
+	.pipe( eslint() )
+	.pipe( eslint.format() )
+	.pipe( eslint.failAfterError() ) );
 
-gulp.task('eslint', function() {
-  return gulp.src(['js/**/*.js'])
-    .pipe(eslint())
-    .pipe(eslint.format())
-    .pipe(eslint.failAfterError());
-});
+gulp.task( "ddescribe-iit", () => gulp.src( [ "test/**/*.js", "js/**/*.js" ] )
+	.pipe( notContains( [
+		"ddescribe", "iit", "xit", "xdescribe"
+	] ) ) );
 
-gulp.task('ddescribe-iit', function() {
-  return gulp.src(['test/**/*.js', 'js/**/*.js'])
-    .pipe(notContains([
-      'ddescribe', 'iit', 'xit', 'xdescribe'
-    ]));
-});
+gulp.task( "vendor", () => gulp.src( buildConfig.vendorFiles, {
+	cwd : "config/lib/",
+	base : "config/lib/"
+} )
+	.pipe( gulp.dest( buildConfig.dist ) ) );
 
-gulp.task('vendor', function() {
-  return gulp.src(buildConfig.vendorFiles, {
-      cwd: 'config/lib/',
-      base: 'config/lib/'
-    })
-    .pipe(gulp.dest(buildConfig.dist));
-});
+gulp.task( "scripts", () => gulp.src( buildConfig.ionicFiles )
+	.pipe( gulpif( IS_RELEASE_BUILD, stripDebug() ) )
+	.pipe( template( {
+		pkg : pkg
+	} ) )
+	.pipe( concat( "ionic.js" ) )
+	.pipe( header( buildConfig.closureStart ) )
+	.pipe( footer( buildConfig.closureEnd ) )
+	.pipe( header( banner ) )
+	.pipe( gulp.dest( `${buildConfig.dist}/js` ) )
+	.pipe( gulpif( IS_RELEASE_BUILD, uglify() ) )
+	.pipe( rename( {
+		extname : ".min.js"
+	} ) )
+	.pipe( header( banner ) )
+	.pipe( gulp.dest( `${buildConfig.dist }/js` ) ) );
 
-gulp.task('scripts', function() {
-  return gulp.src(buildConfig.ionicFiles)
-    .pipe(gulpif(IS_RELEASE_BUILD, stripDebug()))
-    .pipe(template({ pkg: pkg }))
-    .pipe(concat('ionic.js'))
-    .pipe(header(buildConfig.closureStart))
-    .pipe(footer(buildConfig.closureEnd))
-    .pipe(header(banner))
-    .pipe(gulp.dest(buildConfig.dist + '/js'))
-    .pipe(gulpif(IS_RELEASE_BUILD, uglify()))
-    .pipe(rename({ extname: '.min.js' }))
-    .pipe(header(banner))
-    .pipe(gulp.dest(buildConfig.dist + '/js'));
-});
+gulp.task( "scripts-ng", () => gulp.src( buildConfig.angularIonicFiles )
+	.pipe( gulpif( IS_RELEASE_BUILD, stripDebug() ) )
+	.pipe( concat( "ionic-angular.js" ) )
+	.pipe( header( buildConfig.closureStart ) )
+	.pipe( footer( buildConfig.closureEnd ) )
+	.pipe( header( banner ) )
+	.pipe( gulp.dest( `${buildConfig.dist}/js` ) )
+	.pipe( gulpif( IS_RELEASE_BUILD, uglify() ) )
+	.pipe( rename( {
+		extname : ".min.js"
+	} ) )
+	.pipe( header( banner ) )
+	.pipe( gulp.dest( `${buildConfig.dist }/js` ) ) );
 
-gulp.task('scripts-ng', function() {
-  return gulp.src(buildConfig.angularIonicFiles)
-    .pipe(gulpif(IS_RELEASE_BUILD, stripDebug()))
-    .pipe(concat('ionic-angular.js'))
-    .pipe(header(buildConfig.closureStart))
-    .pipe(footer(buildConfig.closureEnd))
-    .pipe(header(banner))
-    .pipe(gulp.dest(buildConfig.dist + '/js'))
-    .pipe(gulpif(IS_RELEASE_BUILD, uglify()))
-    .pipe(rename({ extname: '.min.js' }))
-    .pipe(header(banner))
-    .pipe(gulp.dest(buildConfig.dist + '/js'));
-});
+gulp.task( "sass", done => {
+	gulp.src( "scss/ionic.scss" )
+		// .pipe(header(banner))
+		.pipe( sass().on( "error", err => {
+			if( IS_WATCH ) {
+				console.log( gutil.colors.red( err ) );
+			} else {
+				done( err );
+			}
+		} ) )
+		.pipe( concat( "ionic.css" ) )
+		.pipe( gulp.dest( `${buildConfig.dist}/css` ) )
+		.pipe( gulpif( IS_RELEASE_BUILD, cleanCss() ) )
+		.pipe( rename( {
+			extname : ".min.css"
+		} ) )
+		.pipe( gulp.dest( `${buildConfig.dist}/css` ) )
+		.on( "end", done );
+} );
 
-gulp.task('sass', function(done) {
-  gulp.src('scss/ionic.scss')
-    // .pipe(header(banner))
-    .pipe(sass().on('error', function(err){
-      if (IS_WATCH){
-        console.log(gutil.colors.red(err));
-      } else {
-        done(err);
-      }
-    }))
-    .pipe(concat('ionic.css'))
-    .pipe(gulp.dest(buildConfig.dist + '/css'))
-    .pipe(gulpif(IS_RELEASE_BUILD, cleanCss()))
-    .pipe(rename({ extname: '.min.css' }))
-    .pipe(gulp.dest(buildConfig.dist + '/css'))
-    .on('end', done);
-});
+gulp.task( "version", () => {
+	const d    = new Date();
+	const date = d.toISOString().substring( 0, 10 );
+	const time = `${pad( d.getUTCHours() )
+	}:${pad( d.getUTCMinutes() )
+	}:${pad( d.getUTCSeconds() )}`;
+	return gulp.src( "config/version.template.json" )
+		.pipe( template( {
+			pkg : pkg,
+			date : date,
+			time : time
+		} ) )
+		.pipe( rename( "version.json" ) )
+		.pipe( gulp.dest( buildConfig.dist ) );
+} );
 
-gulp.task('version', function() {
-  var d = new Date();
-  var date = d.toISOString().substring(0,10);
-  var time = pad(d.getUTCHours()) +
-      ':' + pad(d.getUTCMinutes()) +
-      ':' + pad(d.getUTCSeconds());
-  return gulp.src('config/version.template.json')
-    .pipe(template({
-      pkg: pkg,
-      date: date,
-      time: time
-    }))
-    .pipe(rename('version.json'))
-    .pipe(gulp.dest(buildConfig.dist));
-});
+gulp.task( "clean", done => {
+	rimraf( "dist", {}, err => {
+		done( err );
+	} );
+} );
 
-/*
-gulp.task('release-tweet', function(done) {
-  var oauth = {
-    consumerKey: process.env.TWITTER_CONSUMER_KEY,
-    consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
-    accessToken: process.env.TWITTER_ACCESS_TOKEN,
-    accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
-  };
-  var client = new twitter(oauth);
-  client.statuses(
-    'update',
-    {
-      status: argv.test ?
-        'This is a test.' :
-        buildConfig.releaseMessage()
-    },
-    oauth.accessToken,
-    oauth.accessTokenSecret,
-    done
-  );
-});
- */
+gulp.task( "preparePackageJson", done => {
 
-/*
-gulp.task('release-irc', function(done) {
-  var client = irc({
-    host: 'irc.freenode.net',
-    secure: true,
-    nick: 'ionitron',
-    username: 'ionitron',
-    realName: 'ionitron',
-    channels: ['#ionic']
-  }, function() {
-    client.say('#ionic', argv.test ? 'This is a test.' : buildConfig.releaseMessage(), function() {
-      client.quit('', done);
-    });
-  });
-});
-*/
+	function createTimestamp() {
+		// YYYYMMDDHHMM
+		const d = new Date();
+		return d.getUTCFullYear() + // YYYY
+			( `0${d.getUTCMonth() + 1}` ).slice( -2 ) + // MM
+			( `0${d.getUTCDate()}` ).slice( -2 ) + // DD
+			( `0${d.getUTCHours()}` ).slice( -2 ) + // HH
+			( `0${d.getUTCMinutes()}` ).slice( -2 ); // MM
+	}
 
-gulp.task('clean', function(done){
-  rimraf('dist', {}, function(err){
-    done(err);
-  });
-});
+	const existingPackage = require( "./package.json" );
+	existingPackage.name    = "ionic-angular";
+	existingPackage.version = `${existingPackage.version}-${createTimestamp()}`;
+	delete existingPackage.dependencies;
+	delete existingPackage.devDependencies;
+	delete existingPackage.config;
+	fs.writeFile( "./dist/package.json", JSON.stringify( existingPackage, null, 2 ), err => {
+		done( err );
+	} );
+} );
 
-gulp.task('preparePackageJson', function(done){
+gulp.task( "copyReadme", done => {
+	const data = fs.readFileSync( "./README.md" );
+	fs.writeFileSync( "./dist/README.md", data );
+	done();
+} );
 
-  function createTimestamp() {
-    // YYYYMMDDHHMM
-    var d = new Date();
-    return d.getUTCFullYear() + // YYYY
-           ('0' + (d.getUTCMonth() +　1)).slice(-2) + // MM
-           ('0' + (d.getUTCDate())).slice(-2) + // DD
-           ('0' + (d.getUTCHours())).slice(-2) + // HH
-           ('0' + (d.getUTCMinutes())).slice(-2); // MM
-  }
+gulp.task( "prepareForNpm", done => {
+	runSequence( "clean", "bundle", "sass", "preparePackageJson", "copyReadme", done );
+} );
 
-  var existingPackage = require('./package.json');
-  existingPackage.name = "ionic-angular";
-  existingPackage.version = existingPackage.version + "-" + createTimestamp();
-  delete existingPackage.dependencies;
-  delete existingPackage.devDependencies;
-  delete existingPackage.config;
-  fs.writeFile("./dist/package.json", JSON.stringify(existingPackage, null, 2), function(err){
-    done(err);
-  });
-});
+gulp.task( "publishToNpm", [ "prepareForNpm" ], done => {
+	const tagName = argv.tagName && argv.tagName.length > 0 ? argv.tagName : "v1-nightly";
 
-gulp.task('copyReadme', function(done){
-    var data = fs.readFileSync('./README.md');
-    fs.writeFileSync('./dist/README.md', data);
-    done();
-});
+	const spawn = require( "child_process" ).spawn;
 
-gulp.task('prepareForNpm', function(done){
-  runSequence('clean', 'bundle', 'sass', 'preparePackageJson', 'copyReadme', done);
-});
+	const npmCmd = spawn( "npm", [ "publish", `--tag=${tagName}`, "./dist" ] );
+	npmCmd.stdout.on( "data", data => {
+		console.log( data.toString() );
+	} );
 
-gulp.task("publishToNpm", ['prepareForNpm'], function(done){
-  var tagName = argv.tagName && argv.tagName.length > 0 ? argv.tagName : "v1-nightly";
+	npmCmd.stderr.on( "data", data => {
+		console.log( `npm err: ${  data.toString()}` );
+	} );
 
-  var spawn = require('child_process').spawn;
+	npmCmd.on( "close", () => {
+		done();
+	} );
+} );
 
-  var npmCmd = spawn('npm', ['publish', '--tag=' + tagName, './dist']);
-  npmCmd.stdout.on('data', function (data) {
-    console.log(data.toString());
-  });
+function notContains( disallowed ) {
+	disallowed = disallowed || [];
 
-  npmCmd.stderr.on('data', function (data) {
-    console.log('npm err: ' + data.toString());
-  });
+	return through( function( file ) {
+		let error;
+		const contents = file.contents.toString();
+		disallowed.forEach( str => {
+			const idx = disallowedIndex( contents, str );
+			if( idx !== -1 ) {
+				error = error || `${file.path} contains ${str} on line ${
+					contents.substring( 0, idx, str ).split( "\n" ).length}!`;
+			}
+		} );
+		if( error ) {
+			throw new Error( error );
+		} else {
+			this.emit( "data", file );
+		}
+	} );
 
-  npmCmd.on('close', function() {
-    done();
-  });
-});
-
-gulp.task('release-github', function(done) {
-  var github = new GithubApi({
-    version: '3.0.0'
-  });
-  github.authenticate({
-    type: 'oauth',
-    token: process.env.GH_TOKEN
-  });
-  makeChangelog({
-    standalone: true
-  })
-  .then(function(log) {
-    var version = 'v' + pkg.version;
-    github.releases.createRelease({
-      owner: 'ionic-team',
-      repo: 'ionic',
-      tag_name: version,
-      name: version + ' "' + pkg.codename + '"',
-      body: log
-    }, done);
-  })
-  .fail(done);
-});
-
-gulp.task('release-discourse', function(done) {
-  var oldPostUrl = buildConfig.releasePostUrl;
-  var newPostUrl;
-
-  return makeChangelog({
-    standalone: true
-  })
-  .then(function(changelog) {
-    var content = 'Download Instructions: https://github.com/ionic-team/ionic#quick-start\n\n' + changelog;
-    return qRequest({
-      url: 'http://forum.ionicframework.com/posts',
-      method: 'post',
-      form: {
-        api_key: process.env.DISCOURSE_TOKEN,
-        api_username: 'Ionitron',
-        title: argv.test ?
-          ('This is a test. ' + Date.now()) :
-          'v' + pkg.version + ' "' + pkg.codename + '" released!',
-        raw: argv.test ?
-          ('This is a test. Again! ' + Date.now()) :
-          content
-      }
-    });
-  })
-  .then(function(res) {
-    var body = JSON.parse(res.body);
-    newPostUrl = 'http://forum.ionicframework.com/t/' + body.topic_slug + '/' + body.topic_id;
-    fs.writeFileSync(buildConfig.releasePostFile, newPostUrl);
-
-    return q.all([
-      updatePost(newPostUrl, 'closed', true),
-      updatePost(newPostUrl, 'pinned', true),
-      oldPostUrl && updatePost(oldPostUrl, 'pinned', false)
-    ]);
-  });
-
-  function updatePost(url, statusType, isEnabled) {
-    return qRequest({
-      url: url + '/status',
-      method: 'put',
-      form: {
-        api_key: process.env.DISCOURSE_TOKEN,
-        api_username: 'Ionitron',
-        status: statusType,
-        enabled: !!isEnabled
-      }
-    });
-  }
-});
-
-function notContains(disallowed) {
-  disallowed = disallowed || [];
-
-  return through(function(file) {
-    var error;
-    var contents = file.contents.toString();
-    disallowed.forEach(function(str) {
-      var idx = disallowedIndex(contents, str);
-      if (idx !== -1) {
-        error = error || file.path + ' contains ' + str + ' on line ' +
-          contents.substring(0, idx, str).split('\n').length + '!';
-      }
-    });
-    if (error) {
-      throw new Error(error);
-    } else {
-      this.emit('data', file);
-    }
-  });
-
-  function disallowedIndex(content, disallowedString) {
-    var notFunctionName = '[^A-Za-z0-9$_]';
-    var regex = new RegExp('(^|' + notFunctionName + ')(' + disallowedString + ')' + notFunctionName + '*\\(', 'gm');
-    var match = regex.exec(content);
-    // Return the match accounting for the first submatch length.
-    return match !== null ? match.index + match[1].length : -1;
-  }
+	function disallowedIndex( content, disallowedString ) {
+		const notFunctionName = "[^A-Za-z0-9$_]";
+		const regex           = new RegExp( `(^|${notFunctionName})(${disallowedString})${notFunctionName}*(`, "gm" );
+		const match           = regex.exec( content );
+		// Return the match accounting for the first submatch length.
+		return match !== null ? match.index + match[ 1 ].length : -1;
+	}
 }
-function pad(n) {
-  if (n<10) { return '0' + n; }
-  return n;
+function pad( n ) {
+	if( n < 10 ) {
+		return `0${n}`;
+	}
+	return n;
 }
-function qRequest(opts) {
-  var deferred = q.defer();
-  request(opts, function(err, res, body) {
-    if (err) deferred.reject(err);
-    else deferred.resolve(res);
-  });
-  return deferred.promise;
+function qRequest( opts ) {
+	const deferred = q.defer();
+	request( opts, ( err, res, body ) => {
+		if( err ) {
+			deferred.reject( err );
+		} else {
+			deferred.resolve( res );
+		}
+	} );
+	return deferred.promise;
 }

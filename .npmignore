@@ -1,0 +1,9 @@
+/config/
+/node_modules/
+/release/
+/test/
+
+.*
+gulpfile.js
+ionic-sdk.code-workspace
+*.tgz

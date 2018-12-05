@@ -26,7 +26,6 @@ var footer = require('gulp-footer');
 var gulpif = require('gulp-if');
 var header = require('gulp-header');
 var eslint = require('gulp-eslint');
-var jscs = require('gulp-jscs');
 // var minifyCss = require('gulp-minify-css');
 var cleanCss = require('gulp-clean-css');
 var rename = require('gulp-rename');
@@ -48,23 +47,13 @@ if (IS_RELEASE_BUILD) {
   );
 }
 
-/**
- * Load Test Tasks
- */
-require('./config/gulp-tasks/test')(gulp, argv);
-
-/**
- * Load Docs Tasks
- */
-require('./config/gulp-tasks/docs')(gulp, argv);
-
 if (argv.dist) {
   buildConfig.dist = argv.dist;
 }
 
 gulp.task('default', ['build']);
 gulp.task('build', ['bundle', 'sass']);
-gulp.task('validate', ['jscs', 'eslint', 'ddescribe-iit'], function() {
+gulp.task('validate', ['eslint', 'ddescribe-iit'], function() {
   gulp.run('karma')
 });
 
@@ -89,14 +78,13 @@ gulp.task('changelog', function() {
 });
 
 function makeChangelog(options) {
-  var codename = pkg.codename;
   var file = options.standalone ? '' : __dirname + '/CHANGELOG.md';
-  var subtitle = options.subtitle || '"' + codename + '"';
+  var subtitle = options.subtitle || '';
   var from = options.from;
   var version = options.version || pkg.version;
   var deferred = q.defer();
   changelog({
-    repository: 'https://github.com/ionic-team/ionic',
+    repository: 'https://github.com/fairmanager-cordova/ionic-v1',
     version: version,
     subtitle: subtitle,
     file: file,
@@ -131,13 +119,6 @@ gulp.task('bundle', [
     .pipe(header(buildConfig.bundleBanner))
     .pipe(concat('ionic.bundle.js'))
     .pipe(gulp.dest(buildConfig.dist + '/js'));
-});
-
-gulp.task('jscs', function() {
-  return gulp.src(['js/angular/**/*.js'])
-    .pipe(jscs({
-      configPath: '.jscs.json'
-    }));
 });
 
 gulp.task('eslint', function() {
@@ -225,46 +206,6 @@ gulp.task('version', function() {
     .pipe(gulp.dest(buildConfig.dist));
 });
 
-/*
-gulp.task('release-tweet', function(done) {
-  var oauth = {
-    consumerKey: process.env.TWITTER_CONSUMER_KEY,
-    consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
-    accessToken: process.env.TWITTER_ACCESS_TOKEN,
-    accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
-  };
-  var client = new twitter(oauth);
-  client.statuses(
-    'update',
-    {
-      status: argv.test ?
-        'This is a test.' :
-        buildConfig.releaseMessage()
-    },
-    oauth.accessToken,
-    oauth.accessTokenSecret,
-    done
-  );
-});
- */
-
-/*
-gulp.task('release-irc', function(done) {
-  var client = irc({
-    host: 'irc.freenode.net',
-    secure: true,
-    nick: 'ionitron',
-    username: 'ionitron',
-    realName: 'ionitron',
-    channels: ['#ionic']
-  }, function() {
-    client.say('#ionic', argv.test ? 'This is a test.' : buildConfig.releaseMessage(), function() {
-      client.quit('', done);
-    });
-  });
-});
-*/
-
 gulp.task('clean', function(done){
   rimraf('dist', {}, function(err){
     done(err);
@@ -321,80 +262,6 @@ gulp.task("publishToNpm", ['prepareForNpm'], function(done){
   npmCmd.on('close', function() {
     done();
   });
-});
-
-gulp.task('release-github', function(done) {
-  var github = new GithubApi({
-    version: '3.0.0'
-  });
-  github.authenticate({
-    type: 'oauth',
-    token: process.env.GH_TOKEN
-  });
-  makeChangelog({
-    standalone: true
-  })
-  .then(function(log) {
-    var version = 'v' + pkg.version;
-    github.releases.createRelease({
-      owner: 'ionic-team',
-      repo: 'ionic',
-      tag_name: version,
-      name: version + ' "' + pkg.codename + '"',
-      body: log
-    }, done);
-  })
-  .fail(done);
-});
-
-gulp.task('release-discourse', function(done) {
-  var oldPostUrl = buildConfig.releasePostUrl;
-  var newPostUrl;
-
-  return makeChangelog({
-    standalone: true
-  })
-  .then(function(changelog) {
-    var content = 'Download Instructions: https://github.com/ionic-team/ionic#quick-start\n\n' + changelog;
-    return qRequest({
-      url: 'http://forum.ionicframework.com/posts',
-      method: 'post',
-      form: {
-        api_key: process.env.DISCOURSE_TOKEN,
-        api_username: 'Ionitron',
-        title: argv.test ?
-          ('This is a test. ' + Date.now()) :
-          'v' + pkg.version + ' "' + pkg.codename + '" released!',
-        raw: argv.test ?
-          ('This is a test. Again! ' + Date.now()) :
-          content
-      }
-    });
-  })
-  .then(function(res) {
-    var body = JSON.parse(res.body);
-    newPostUrl = 'http://forum.ionicframework.com/t/' + body.topic_slug + '/' + body.topic_id;
-    fs.writeFileSync(buildConfig.releasePostFile, newPostUrl);
-
-    return q.all([
-      updatePost(newPostUrl, 'closed', true),
-      updatePost(newPostUrl, 'pinned', true),
-      oldPostUrl && updatePost(oldPostUrl, 'pinned', false)
-    ]);
-  });
-
-  function updatePost(url, statusType, isEnabled) {
-    return qRequest({
-      url: url + '/status',
-      method: 'put',
-      form: {
-        api_key: process.env.DISCOURSE_TOKEN,
-        api_username: 'Ionitron',
-        status: statusType,
-        enabled: !!isEnabled
-      }
-    });
-  }
 });
 
 function notContains(disallowed) {

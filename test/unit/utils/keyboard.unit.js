@@ -209,21 +209,6 @@ describe('Ionic Keyboard', function() {
     expect(document.activeElement == element).toBe(false);
   });
 
-  it('keyboardHide should call cordova.plugins.Keyboard.close if the plugin is available', function(){
-    ionic.Platform.setPlatform('Android');
-    cordova = {
-      'plugins': {
-        'Keyboard': {
-          'close': function(){}
-        }
-      }
-    };
-    expect(keyboardHasPlugin()).toBe(true);
-    spyOn(cordova.plugins.Keyboard, 'close');
-    keyboardHide();
-    expect(cordova.plugins.Keyboard.close).toHaveBeenCalled();
-  });
-
   it('keyboardHide should remove KEYBOARD_OPEN_CSS from the body', function(){
     document.body.classList.add(KEYBOARD_OPEN_CSS);
     expect(document.body.classList.contains(KEYBOARD_OPEN_CSS)).toBe(true);
@@ -291,13 +276,7 @@ describe('Ionic Keyboard', function() {
   it('Should keyboardHasPlugin', function() {
     expect(keyboardHasPlugin()).toEqual(false);
 
-    window.cordova = {};
-    expect(keyboardHasPlugin()).toEqual(false);
-
-    window.cordova.plugins = {};
-    expect(keyboardHasPlugin()).toEqual(false);
-
-    window.cordova.plugins.Keyboard = {};
+    window.Keyboard = {};
     expect(keyboardHasPlugin()).toEqual(true);
   });
 

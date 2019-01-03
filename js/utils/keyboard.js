@@ -63,7 +63,16 @@
  *
  *   ```xml
  *   <activity android:windowSoftInputMode="adjustResize">
+ *
  *   ```
+ *
+ * ### iOS Notes
+ * - If the content of your app (including the header) is being pushed up and
+ *   out of view on input focus, try setting `cordova.plugins.Keyboard.disableScroll(true)`.
+ *   This does **not** disable scrolling in the Ionic scroll view, rather it
+ *   disables the native overflow scrolling that happens automatically as a
+ *   result of focusing on inputs below the keyboard.
+ *
  */
 
 /**
@@ -181,18 +190,18 @@ ionic.keyboard = {
    */
   hide: function() {
     if (keyboardHasPlugin()) {
-      window.Keyboard.close();
+      cordova.plugins.Keyboard.close();
     }
     keyboardActiveElement && keyboardActiveElement.blur();
   },
 
   /**
-   * An alias for window.Keyboard.show(). If the keyboard plugin
+   * An alias for cordova.plugins.Keyboard.show(). If the keyboard plugin
    * is installed, show the keyboard.
    */
   show: function() {
     if (keyboardHasPlugin()) {
-      window.Keyboard.show();
+      cordova.plugins.Keyboard.show();
     }
   },
 
@@ -567,7 +576,7 @@ function keyboardHide() {
   if (ionic.Platform.isAndroid()) {
     // on android closing the keyboard with the back/dismiss button won't remove
     // focus and keyboard can re-appear on subsequent taps (like scrolling)
-    if (keyboardHasPlugin()) window.Keyboard.close();
+    if (keyboardHasPlugin()) cordova.plugins.Keyboard.close();
     keyboardActiveElement && keyboardActiveElement.blur();
   }
 
@@ -731,7 +740,7 @@ function getViewportHeight() {
 }
 
 function keyboardHasPlugin() {
-  return !!(window && window.Keyboard);
+  return !!(window.cordova && cordova.plugins && cordova.plugins.Keyboard);
 }
 
 ionic.Platform.ready(function() {
